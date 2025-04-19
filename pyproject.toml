@@ -5,30 +5,30 @@ build-backend = "hatchling.build"
 [project]
 name = "robust-whisper-trainer"
 version = "0.1.0"
-description = "A project for training Huggingface models"
+description = "A project for training robust Whisper encoders via teacher-student distillation"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
+authors = [
+    {name = "AI Team", email = "ai@example.com"}
+]
 dependencies = [
     "torch>=2.0.0",
     "transformers>=4.30.0",
     "datasets>=2.12.0",
     "evaluate>=0.4.0",
     "accelerate>=0.20.0",
-    "tensorboard>=2.13.0",
     "numpy>=1.24.0",
     "pandas>=2.0.0",
     "tqdm>=4.65.0",
+    "wandb>=0.19.9",
+    "soundfile>=0.13.1",
+    "librosa>0.10.0,<0.11.0",
+    "audiomentations==0.40",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "black>=23.3.0",
-    "isort>=5.12.0",
-    "flake8>=6.0.0",
-    "pytest>=7.3.1",
-    "pytest-cov>=4.1.0",
-]
+[project.scripts]
+robust-whisper-train = "robust_whisper_trainer.cli:main"
 
 [tool.black]
 line-length = 88
@@ -41,3 +41,14 @@ line_length = 88
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
+
+[dependency-groups]
+dev = [
+    "black>=23.3.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "pytest>=8.3.5",
+    "pytest-cov>=4.1.0",
+    "huggingface-hub[cli]>=0.30.2",
+    "ipykernel>=6.29.5",
+]

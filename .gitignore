@@ -135,3 +135,7 @@ data/
 # Logs
 logs/
 runs/
+wandb/
+
+# Outputs
+outputs/
