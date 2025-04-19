@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 from datasets import IterableDataset, load_dataset, IterableDatasetDict, Audio
 from transformers import (
+    BatchFeature,
     Trainer,
     TrainingArguments,
     WhisperModel,
@@ -103,6 +104,29 @@ class RobustWhisperTrainingArguments:
     )
 
 
+@dataclass
+class DataCollator:
+    processor: Any
+
+    def __call__(
+        self, features: List[Dict[str, Union[List[int], torch.Tensor]]]
+    ) -> Dict[str, torch.Tensor]:
+        input_features = []
+        clean_features = []
+        for feature in features:
+            input_features.append(feature["input_features"].clone().detach())
+            clean_features.append(feature["clean_features"].clone().detach())
+
+        batch = BatchFeature(
+            {
+                "input_features": torch.stack(input_features),
+                "clean_features": torch.stack(clean_features),
+            }
+        )
+
+        return batch
+
+
 class RobustWhisperTrainer:
     """Trainer for robust Whisper encoder."""
 
@@ -126,6 +150,7 @@ class RobustWhisperTrainer:
         # Initialize components
         self._init_augmenter()
         self._init_feature_extractor()
+        self._init_collator()
         self._init_model()
 
     def _init_augmenter(self) -> None:
@@ -142,6 +167,9 @@ class RobustWhisperTrainer:
             augmenter=self.augmenter,
             max_audio_length=self.args.max_audio_length,
         )
+    
+    def _init_collator(self) -> None:
+        self.collator = DataCollator(self.data_preprocessor)
 
     def _init_model(self) -> None:
         """Initialize the teacher-student model."""
@@ -206,11 +234,7 @@ class RobustWhisperTrainer:
             args=self.training_args,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            # compute_loss_func=compute_loss,
-            data_collator=lambda features: {
-                key: torch.stack([torch.tensor(f[key]) for f in features])
-                for key in features[0].keys()
-            },
+            data_collator=self.collator
         )
 
         # Train the model
