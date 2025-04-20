@@ -2,20 +2,19 @@
 """Example script for training a robust Whisper encoder."""
 
 import os
-from datasets import load_dataset
 from transformers import TrainingArguments
 
 from robust_whisper_trainer import (
     RobustWhisperTrainer,
     RobustWhisperTrainingArguments,
-    AudioAugmenter,
 )
 
 
 def main():
     """Main function."""
     # Define output directory
-    output_dir = "./outputs/robust-whisper"
+    run_name = "enc_tiny_exp_1"
+    output_dir = "./outputs/" + run_name
     os.makedirs(output_dir, exist_ok=True)
     
     # Define robust Whisper training arguments
@@ -24,8 +23,11 @@ def main():
         model_name_or_path="openai/whisper-tiny",
         
         # Data arguments
-        train_dataset="hf-internal-testing/librispeech_asr_dummy:validation",
-        eval_dataset="hf-internal-testing/librispeech_asr_dummy:validation",
+        # train_dataset="yoad/crowd-transcribe-v5-xs-migrated:train",
+        # eval_dataset="yoad/crowd-transcribe-v5-xs-migrated:test",
+        # train_dataset="hf-internal-testing/librispeech_asr_dummy:validation",
+        # eval_dataset="hf-internal-testing/librispeech_asr_dummy:validation",
+        preprocessed_dataset="./outputs/prep_ds",
         data_preprocess_batch_size=1,
         data_preprocess_workers=1,
         audio_column_name="audio",
@@ -38,9 +40,6 @@ def main():
         loss_layer_weights=None,  # Use only the last layer
         loss_cosine_lambda=0.1,  # Small weight for cosine similarity loss
         
-        # Output arguments
-        output_dir=output_dir,
-        
         # Other arguments
         seed=42,
     )
@@ -50,10 +49,10 @@ def main():
         output_dir=output_dir,
         
         # Training hyperparameters
-        per_device_train_batch_size=4,
+        per_device_train_batch_size=1,
         per_device_eval_batch_size=8,
         gradient_accumulation_steps=4,
-        learning_rate=5e-5,
+        learning_rate=1e-6,
         # weight_decay=0.01,
         # adam_beta1=0.9,
         # adam_beta2=0.999,
@@ -73,13 +72,16 @@ def main():
         save_steps=1000,
         save_total_limit=3,
         max_steps=2,
+        run_name=run_name,
+        report_to="none"
         
         # Other settings
-        # fp16=True,  # Use mixed precision training
-        # load_best_model_at_end=True,
         metric_for_best_model="loss",
         greater_is_better=False,
         push_to_hub=False,
+
+        # DDP
+        ddp_find_unused_parameters=False,
     )
     
     # Initialize trainer

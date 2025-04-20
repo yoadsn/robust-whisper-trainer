@@ -1,7 +1,13 @@
 {
   "model_name_or_path": "openai/whisper-tiny",
+  
+  "# You can either specify train and eval datasets": "",
   "train_dataset": "hf-internal-testing/librispeech_asr_dummy:validation",
   "eval_dataset": "hf-internal-testing/librispeech_asr_dummy:validation",
+  
+  "# Or use a preprocessed dataset (which takes precedence if specified)": "",
+  "# preprocessed_dataset": "./preprocessed_data",
+  
   "audio_column_name": "audio",
   "max_audio_length": 30.0,
   "augmenter_preset": "all",

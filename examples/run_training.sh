@@ -17,8 +17,7 @@ robust-whisper-train examples/config.json
 #     --model_name_or_path="openai/whisper-small" \
 #     --train_dataset="hf-internal-testing/librispeech_asr_dummy:validation" \
 #     --eval_dataset="hf-internal-testing/librispeech_asr_dummy:validation" \
-#     --dataset_config_name="en" \
-#     --augmenter_preset="all" \
+#     --augmenter_preset="default" \
 #     --output_dir="./outputs/robust-whisper" \
 #     --per_device_train_batch_size=8 \
 #     --learning_rate=5e-5 \

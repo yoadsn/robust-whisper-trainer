@@ -1,26 +1,21 @@
 """Training harness for robust Whisper encoder training."""
 
-from typing import Dict, List, Optional, Tuple, Union, Any, Callable
+from typing import Dict, List, Optional, Tuple, Union, Any
 import os
-import re
-import dataclasses
 from dataclasses import dataclass, field
 import torch
-import torch.nn as nn
-from datasets import IterableDataset, load_dataset, IterableDatasetDict, Audio
+from datasets import Dataset
 from transformers import (
     BatchFeature,
     Trainer,
     TrainingArguments,
-    WhisperModel,
-    WhisperFeatureExtractor,
     HfArgumentParser,
 )
 
 from .audio_augmenter import AudioAugmenter
 from .data_preprocessor import DataPreprocessor
 from .model_wrapper import WhisperEncoderTeacherStudentWrapper
-from .loss_computer import DistillationLoss
+from .datasets import load_datasets
 
 
 @dataclass
@@ -46,6 +41,13 @@ class RobustWhisperTrainingArguments:
         default=None,
         metadata={
             "help": "The name of the eval dataset to use (via the datasets library) - format: <dataset_name>:<split>[:<config_name>]"
+        },
+    )
+    preprocessed_dataset: str = field(
+        default=None,
+        metadata={
+            "help": "Path to a preprocessed dataset saved with DatasetDict.save_to_disk(). "
+                   "If provided, train_dataset and eval_dataset will be ignored."
         },
     )
     audio_column_name: str = field(
@@ -87,14 +89,6 @@ class RobustWhisperTrainingArguments:
     loss_cosine_lambda: float = field(
         default=0.0,
         metadata={"help": "Weight for cosine similarity loss (0 means use only MSE)"},
-    )
-
-    # Output arguments
-    output_dir: str = field(
-        default="./outputs",
-        metadata={
-            "help": "The output directory where the model predictions and checkpoints will be written"
-        },
     )
 
     # Other arguments
@@ -179,47 +173,28 @@ class RobustWhisperTrainer:
             loss_cosine_lambda=self.args.loss_cosine_lambda,
         )
 
-    def load_dataset(self) -> Tuple[IterableDataset, IterableDataset]:
+    def load_dataset(self) -> Tuple[Dataset, Dataset]:
         """Load the train/eval dataset.
 
         Returns:
             Tuple of (train_dataset, eval_dataset)
         """
-
-        # Split on : but allow : inside [] for the HF split slicing syntax
-        # https://huggingface.co/docs/datasets/loading#slice-splits
-        dataset_spec_split_pattern = r":(?=(?:[^\[\]]|\[[^\[\]]*\])*$)"
-
-        def load_dataset_spec(spec):
-            parts = re.split(dataset_spec_split_pattern, spec)
-            if len(parts) < 2 or len(parts) > 3:
-                raise ValueError(f"Invalid dataset spec: {spec}")
-            dataset_name = parts[0]
-            split = parts[1]
-            config_name = parts[2] if len(parts) > 2 else None
-
-            dataset = load_dataset(
-                dataset_name,
-                config_name,
-                split=split,
-                streaming=True,
-            ).cast_column("audio", Audio(sampling_rate=16000, mono=True))
-
-            return dataset
-
-        train_dataset = load_dataset_spec(self.args.train_dataset)
-        eval_dataset = load_dataset_spec(self.args.eval_dataset)
-
-        dataset_split_dict = IterableDatasetDict(
-            {"train": train_dataset, "eval": eval_dataset}
-        )
-
-        dataset_split_dict = self.data_preprocessor.prepare_dataset(
-            dataset_split_dict,
-            batch_size=self.args.data_preprocess_batch_size,
-            num_workers=self.args.data_preprocess_workers,
-            shuffle=self.args.data_preprocess_shuffle,
-        )
+        if self.args.preprocessed_dataset:
+            # Load preprocessed dataset from disk
+            print(f"Loading preprocessed dataset from {self.args.preprocessed_dataset}")
+            from datasets import load_from_disk
+            dataset_split_dict = load_from_disk(self.args.preprocessed_dataset)
+        else:
+            # Load and preprocess datasets from specifications
+            dataset_split_dict = load_datasets(
+                train_dataset_spec=self.args.train_dataset,
+                eval_dataset_spec=self.args.eval_dataset,
+                data_preprocessor=self.data_preprocessor,
+                batch_size=self.args.data_preprocess_batch_size,
+                num_workers=self.args.data_preprocess_workers,
+                shuffle=self.args.data_preprocess_shuffle,
+                audio_column_name=self.args.audio_column_name,
+            )
 
         return dataset_split_dict["train"], dataset_split_dict["eval"]
 
@@ -245,13 +220,14 @@ class RobustWhisperTrainer:
 
     def save_model(self) -> None:
         """Save the trained model."""
+        output_dir = self.training_args.output_dir
         # Create output directory if it doesn't exist
-        os.makedirs(self.args.output_dir, exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
 
         # Save the student encoder
-        self.model.save_pretrained(self.args.output_dir)
+        self.model.save_pretrained(output_dir)
 
-        print(f"Model saved to {self.args.output_dir}")
+        print(f"Model saved to {output_dir}")
 
 
 def parse_args() -> Tuple[RobustWhisperTrainingArguments, TrainingArguments]:

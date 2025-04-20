@@ -24,9 +24,13 @@ def main():
     # Print configuration
     print("Robust Whisper Trainer Configuration:")
     print(f"  Model: {robust_args.model_name_or_path}")
-    print(f"  Dataset: {robust_args.dataset_name}")
+    if not robust_args.preprocessed_dataset:
+        print(f"  Train Dataset: {robust_args.train_dataset}")
+        print(f"  Eval Dataset: {robust_args.eval_dataset}")
+    else:
+        print(f"  Preprocessed Dataset: {robust_args.preprocessed_dataset}")
     print(f"  Augmenter preset: {robust_args.augmenter_preset}")
-    print(f"  Output directory: {robust_args.output_dir}")
+    print(f"  Output directory: {training_args.output_dir}")
     print(f"  Training arguments: {training_args}")
     
     # Initialize trainer

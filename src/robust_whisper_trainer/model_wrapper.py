@@ -144,11 +144,10 @@ class WhisperEncoderTeacherStudentWrapper(nn.Module):
 
         # Update the model's encoder weights
         updated_model_state_dict = base_model.state_dict()
-        for key, value in self.student_model.state_dict().items():
-            encoder_key = "encoder." + key
+        for encoder_key, value in self.student_model.state_dict(prefix="encoder.").items():
             if encoder_key in updated_model_state_dict:
                 updated_model_state_dict[encoder_key] = value
-
+        
         # Load the updated state dict
         base_model.load_state_dict(updated_model_state_dict)
 
