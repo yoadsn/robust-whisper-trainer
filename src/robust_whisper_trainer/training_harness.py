@@ -31,16 +31,16 @@ class RobustWhisperTrainingArguments:
     )
 
     # Data arguments
-    train_dataset: str = field(
+    train_dataset: Union[str, List[str]] = field(
         default=None,
         metadata={
-            "help": "The name of the train dataset to use (via the datasets library) - format: <dataset_name>:<split>[:<config_name>]"
+            "help": "The name of the train dataset(s) to use (via the datasets library) - format: <dataset_name>:<split>[:<config_name>]\nMulitple datasets can be specified by separating them with a space"
         },
     )
-    eval_dataset: str = field(
+    eval_dataset: Union[str, List[str]] = field(
         default=None,
         metadata={
-            "help": "The name of the eval dataset to use (via the datasets library) - format: <dataset_name>:<split>[:<config_name>]"
+            "help": "The name of the eval dataset(s) to use (via the datasets library) - format: <dataset_name>:<split>[:<config_name>]\nMulitple datasets can be specified by separating them with a space"
         },
     )
     preprocessed_dataset: str = field(

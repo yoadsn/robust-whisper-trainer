@@ -100,25 +100,29 @@ class DataPreprocessor:
             PyTorch DataLoader with preprocessed samples
         """
 
+        # limit parallelism to number of workers
+        parallel_sem = asyncio.Semaphore(num_workers)
+
         # Define preprocessing function for the dataset
-        def preprocess_function(examples):
-            # Process each audio sample in the batch
-            batch_size = len(examples["audio"])
-            result = {
-                "input_features": [],
-                "clean_features": [],
-            }
+        async def preprocess_function(examples):
+            async with parallel_sem:
+                # Process each audio sample in the batch
+                batch_size = len(examples["audio"])
+                result = {
+                    "input_features": [],
+                    "clean_features": [],
+                }
 
-            for i in range(batch_size):
-                processed = self.preprocess_audio(examples["audio"][i])
-                result["input_features"].append(processed["input_features"])
-                result["clean_features"].append(processed["clean_features"])
+                for i in range(batch_size):
+                    processed = self.preprocess_audio(examples["audio"][i])
+                    result["input_features"].append(processed["input_features"])
+                    result["clean_features"].append(processed["clean_features"])
 
-            # Stack tensors
-            for key in result:
-                result[key] = torch.cat(result[key], dim=0)
+                # Stack tensors
+                for key in result:
+                    result[key] = torch.cat(result[key], dim=0)
 
-            return result
+                return result
 
         # Apply preprocessing to the dataset
         any_split = next(iter(dataset.keys()))
@@ -130,12 +134,10 @@ class DataPreprocessor:
             remove_columns=columns_to_remove,
             num_proc=num_workers,
         )
+        processed_dataset.set_format(type="torch")
 
         if shuffle:
-            # For non-streaming datasets, we need to shuffle differently
-            processed_dataset = DatasetDict({
-                split: dataset.shuffle(seed=42) for split, dataset in processed_dataset.items()
-            })
+            processed_dataset.shuffle()
 
         return processed_dataset
 

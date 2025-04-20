@@ -1,15 +1,16 @@
 """Dataset loading and processing for robust Whisper encoder training."""
 
 import re
-from typing import Optional, Tuple
-from datasets import load_dataset, DatasetDict, Audio
+from typing import List, Union
+
+from datasets import Audio, DatasetDict, concatenate_datasets, load_dataset
 
 from .data_preprocessor import DataPreprocessor
 
 
 def load_datasets(
-    train_dataset_spec: str,
-    eval_dataset_spec: str,
+    train_dataset_spec: Union[str, List[str]],
+    eval_dataset_spec: Union[str, List[str]],
     data_preprocessor: DataPreprocessor,
     batch_size: int = 1,
     num_workers: int = 1,
@@ -52,12 +53,25 @@ def load_datasets(
 
         return dataset
 
-    train_dataset = load_dataset_spec(train_dataset_spec)
-    eval_dataset = load_dataset_spec(eval_dataset_spec)
+    def load_dataset_specs(specs):
+        loaded_datasets = []
+        for spec in specs:
+            loaded_datasets.append(load_dataset_spec(spec))
+        return (
+            concatenate_datasets(loaded_datasets)
+            if len(loaded_datasets) > 1
+            else loaded_datasets[0]
+        )
 
-    dataset_split_dict = DatasetDict(
-        {"train": train_dataset, "eval": eval_dataset}
-    )
+    if isinstance(train_dataset_spec, str):
+        train_dataset_spec = [train_dataset_spec]
+    if isinstance(eval_dataset_spec, str):
+        eval_dataset_spec = [eval_dataset_spec]
+
+    train_dataset = load_dataset_specs(train_dataset_spec)
+    eval_dataset = load_dataset_specs(eval_dataset_spec)
+
+    dataset_split_dict = DatasetDict({"train": train_dataset, "eval": eval_dataset})
 
     dataset_split_dict = data_preprocessor.prepare_dataset(
         dataset_split_dict,

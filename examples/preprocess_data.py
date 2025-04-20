@@ -18,12 +18,14 @@ def main():
     parser.add_argument(
         "--train_dataset",
         type=str,
+        nargs="+",
         required=True,
         help="The name of the train dataset to use (via the datasets library) - format: <dataset_name>:<split>[:<config_name>]",
     )
     parser.add_argument(
         "--eval_dataset",
         type=str,
+        nargs="+",
         required=True,
         help="The name of the eval dataset to use (via the datasets library) - format: <dataset_name>:<split>[:<config_name>]",
     )
