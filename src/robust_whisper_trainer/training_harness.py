@@ -3,6 +3,7 @@
 from typing import Dict, List, Optional, Tuple, Union, Any
 import os
 from dataclasses import dataclass, field
+from accelerate import Accelerator
 import torch
 from datasets import Dataset
 from transformers import (
@@ -10,12 +11,15 @@ from transformers import (
     Trainer,
     TrainingArguments,
     HfArgumentParser,
+    WhisperFeatureExtractor,
 )
 
 from .audio_augmenter import AudioAugmenter
 from .data_preprocessor import DataPreprocessor
 from .model_wrapper import WhisperEncoderTeacherStudentWrapper
 from .datasets import load_datasets
+
+accelerator = Accelerator()
 
 
 @dataclass
@@ -47,8 +51,12 @@ class RobustWhisperTrainingArguments:
         default=None,
         metadata={
             "help": "Path to a preprocessed dataset saved with DatasetDict.save_to_disk(). "
-                   "If provided, train_dataset and eval_dataset will be ignored."
+            "If provided, train_dataset and eval_dataset will be ignored."
         },
+    )
+    max_eval_samples: int = field(
+        default=None,
+        metadata={"help": "Max amount of eval samples to process."},
     )
     audio_column_name: str = field(
         default="audio",
@@ -161,7 +169,7 @@ class RobustWhisperTrainer:
             augmenter=self.augmenter,
             max_audio_length=self.args.max_audio_length,
         )
-    
+
     def _init_collator(self) -> None:
         self.collator = DataCollator(self.data_preprocessor)
 
@@ -183,6 +191,7 @@ class RobustWhisperTrainer:
             # Load preprocessed dataset from disk
             print(f"Loading preprocessed dataset from {self.args.preprocessed_dataset}")
             from datasets import load_from_disk
+
             dataset_split_dict = load_from_disk(self.args.preprocessed_dataset)
         else:
             # Load and preprocess datasets from specifications
@@ -196,7 +205,14 @@ class RobustWhisperTrainer:
                 audio_column_name=self.args.audio_column_name,
             )
 
-        return dataset_split_dict["train"], dataset_split_dict["eval"]
+        train_result_ds = dataset_split_dict["train"]
+        eval_results_ds = dataset_split_dict["eval"]
+        if self.args.max_eval_samples is not None:
+            eval_results_ds = eval_results_ds.shuffle().select(
+                range(self.args.max_eval_samples)
+            )
+
+        return train_result_ds, eval_results_ds
 
     def train(self) -> None:
         """Train the model."""
@@ -209,14 +225,15 @@ class RobustWhisperTrainer:
             args=self.training_args,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            data_collator=self.collator
+            data_collator=self.collator,
         )
 
         # Train the model
         trainer.train()
 
         # Save the model
-        self.save_model()
+        if accelerator.is_main_process:
+            self.save_model()
 
     def save_model(self) -> None:
         """Save the trained model."""
@@ -226,6 +243,12 @@ class RobustWhisperTrainer:
 
         # Save the student encoder
         self.model.save_pretrained(output_dir)
+
+        # Load/save to output the processor as well
+        processor = WhisperFeatureExtractor.from_pretrained(
+            self.args.model_name_or_path
+        )
+        processor.save_pretrained(output_dir)
 
         print(f"Model saved to {output_dir}")
 
