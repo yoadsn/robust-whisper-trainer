@@ -25,7 +25,7 @@ class SampleDownUpResample(BaseWaveformTransform):
         """
         super().__init__(p)
         self.down_to_sample_rate = down_to_sample_rate
-        self.resample_down = Resample(p=1, min_sample_rate=4000, max_sample_rate=4000)
+        self.resample_down = Resample(p=1, min_sample_rate=down_to_sample_rate, max_sample_rate=down_to_sample_rate)
 
     def randomize_parameters(self, samples: NDArray[np.float32], sample_rate: int):
         super().randomize_parameters(samples, sample_rate)
